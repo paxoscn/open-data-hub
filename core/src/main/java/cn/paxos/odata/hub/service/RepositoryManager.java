@@ -64,6 +64,13 @@ public class RepositoryManager
                     confirmClassLoader();
                     return repository.asyncListCheck(jobId);
                   }
+                  @Override
+                  public void create(EntitySetMeta entitySetMeta,
+                      Map<String, Object> conditions)
+                  {
+                    confirmClassLoader();
+                    repository.create(entitySetMeta, conditions);
+                  }
                   private void confirmClassLoader()
                   {
                     if (Thread.currentThread().getContextClassLoader() != plugin.getClassLoader())

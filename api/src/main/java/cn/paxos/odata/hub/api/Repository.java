@@ -14,4 +14,6 @@ public interface Repository
 
   <E> List<E> asyncListCheck(String jobId);
 
+  void create(EntitySetMeta entitySetMeta, Map<String, Object> conditions);
+
 }

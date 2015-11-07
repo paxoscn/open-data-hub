@@ -48,4 +48,11 @@ public class SimpleRepository implements Repository
     return null;
   }
 
+  @Override
+  public void create(EntitySetMeta entitySetMeta,
+      Map<String, Object> conditions)
+  {
+    // TODO Auto-generated method stub
+  }
+
 }

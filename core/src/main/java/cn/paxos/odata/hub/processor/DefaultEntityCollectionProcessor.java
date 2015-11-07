@@ -1,12 +1,15 @@
 package cn.paxos.odata.hub.processor;
 
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 import org.apache.olingo.commons.api.data.ContextURL;
+import org.apache.olingo.commons.api.data.Entity;
 import org.apache.olingo.commons.api.data.EntityCollection;
+import org.apache.olingo.commons.api.data.Property;
 import org.apache.olingo.commons.api.edm.EdmEntitySet;
 import org.apache.olingo.commons.api.edm.EdmEntityType;
 import org.apache.olingo.commons.api.edm.EdmEnumType;
@@ -21,12 +24,15 @@ import org.apache.olingo.server.api.ODataRequest;
 import org.apache.olingo.server.api.ODataResponse;
 import org.apache.olingo.server.api.ServiceMetadata;
 import org.apache.olingo.server.api.deserializer.DeserializerException;
+import org.apache.olingo.server.api.deserializer.DeserializerResult;
+import org.apache.olingo.server.api.deserializer.ODataDeserializer;
 import org.apache.olingo.server.api.processor.ComplexProcessor;
 import org.apache.olingo.server.api.processor.EntityCollectionProcessor;
 import org.apache.olingo.server.api.processor.EntityProcessor;
 import org.apache.olingo.server.api.processor.PrimitiveProcessor;
 import org.apache.olingo.server.api.processor.PrimitiveValueProcessor;
 import org.apache.olingo.server.api.serializer.EntityCollectionSerializerOptions;
+import org.apache.olingo.server.api.serializer.EntitySerializerOptions;
 import org.apache.olingo.server.api.serializer.ODataSerializer;
 import org.apache.olingo.server.api.serializer.SerializerException;
 import org.apache.olingo.server.api.serializer.SerializerResult;
@@ -262,8 +268,44 @@ public class DefaultEntityCollectionProcessor implements
       throws ODataApplicationException, DeserializerException,
       SerializerException
   {
-    throw new ODataApplicationException("Entity create is not supported yet.",
-        HttpStatusCode.NOT_IMPLEMENTED.getStatusCode(), Locale.ENGLISH);
+    List<UriResource> resourcePaths = uriInfo.getUriResourceParts();
+    UriResourceEntitySet uriResourceEntitySet = (UriResourceEntitySet) resourcePaths
+        .get(0);
+    EdmEntitySet edmEntitySet = uriResourceEntitySet.getEntitySet();
+    for (Repository repository : repositoryManager.getRepositories())
+    {
+      for (EntitySetMeta entitySetMeta : repository.getEntitySetMetas())
+      {
+        if (entitySetMeta.getName().equals(edmEntitySet.getName()))
+        {
+          EdmEntityType edmEntityType = edmEntitySet.getEntityType();
+          InputStream requestInputStream = request.getBody();
+          ODataDeserializer deserializer = this.odata
+              .createDeserializer(ODataFormat.fromContentType(requestFormat));
+          DeserializerResult result = deserializer.entity(requestInputStream,
+              edmEntityType);
+          Entity requestEntity = result.getEntity();
+          final Map<String, Object> conditions = new HashMap<String, Object>();
+          for (Property property : requestEntity.getProperties())
+          {
+            conditions.put(property.getName(), property.getValue());
+          }
+          repository.create(entitySetMeta, conditions);
+          Entity createdEntity = requestEntity;
+          ContextURL contextUrl = ContextURL.with().entitySet(edmEntitySet).build();
+          EntitySerializerOptions options = EntitySerializerOptions.with()
+              .contextURL(contextUrl).build();
+          ODataSerializer serializer = this.odata.createSerializer(ODataFormat.fromContentType(responseFormat));
+          SerializerResult serializedResponse = serializer.entity(serviceMetadata,
+              edmEntityType, createdEntity, options);
+          response.setContent(serializedResponse.getContent());
+          response.setStatusCode(HttpStatusCode.CREATED.getStatusCode());
+          response.setHeader(HttpHeader.CONTENT_TYPE,
+              responseFormat.toContentTypeString());
+          return;
+        }
+      }
+    }
   }
 
   @Override
